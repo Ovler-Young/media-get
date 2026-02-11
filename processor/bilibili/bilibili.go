@@ -3,6 +3,7 @@ package bilibili
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/foamzou/audio-get/args"
@@ -44,9 +45,11 @@ func (c *Core) FetchMetaAndResourceInfo() (mediaMeta *meta.MediaMeta, err error)
 	}
 
 	// audio resource
+	// audio resource
 	matchStr, err := utils.RegexSingleMatch(html, `window.__playinfo__=(.+?)<\/script`)
 	if err != nil {
-		return
+		logger.Warn("fetch playinfo failed, try to fetch from api", err)
+		return c.fetchBytesFromApi()
 	}
 	resource := &AudioResource{}
 	err = json.Unmarshal([]byte(matchStr), resource)
@@ -95,6 +98,123 @@ func (c *Core) FetchMetaAndResourceInfo() (mediaMeta *meta.MediaMeta, err error)
 		})
 	}
 
+	return mediaMeta, nil
+}
+
+func (c *Core) fetchBytesFromApi() (mediaMeta *meta.MediaMeta, err error) {
+	bvid := utils.RegexSingleMatchIgnoreError(c.Opts.Url, `(BV[a-zA-Z0-9]+)`, "")
+	if bvid == "" {
+		return nil, errors.New("bvid not found")
+	}
+
+	// fetch meta
+	metaUrl := "https://api.bilibili.com/x/web-interface/view?bvid=" + bvid
+	metaJson, err := utils.HttpGet(consts.SourceNameBilibili, metaUrl, map[string]string{
+		"user-agent": consts.UAMac,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var metaData BilibiliWebInterfaceView
+	err = json.Unmarshal([]byte(metaJson), &metaData)
+	if err != nil {
+		return nil, err
+	}
+	if metaData.Code != 0 {
+		return nil, errors.New(metaData.Message)
+	}
+
+	// fetch resource
+	playUrl := "https://api.bilibili.com/x/player/playurl?bvid=" + bvid + "&cid=" + strconv.Itoa(metaData.Data.Cid) + "&qn=80&fnval=4048"
+	playJson, err := utils.HttpGet(consts.SourceNameBilibili, playUrl, map[string]string{
+		"user-agent": consts.UAMac,
+		"referer":    c.Opts.Url,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var playData BilibiliPlayUrlResponse
+	err = json.Unmarshal([]byte(playJson), &playData)
+	if err != nil {
+		return nil, err
+	}
+	if playData.Code != 0 {
+		return nil, errors.New(playData.Message)
+	}
+
+	// construct meta
+	mediaMeta = &meta.MediaMeta{
+		Title:        metaData.Data.Title,
+		Description:  metaData.Data.Desc,
+		Duration:     playData.Data.Dash.Duration,
+		CoverUrl:     metaData.Data.Pic,
+		ResourceType: consts.ResourceTypeVideo,
+		Album:        Album,
+		Headers: map[string]string{
+			"user-agent": consts.UAMac,
+			"referer":    c.Opts.Url,
+		},
+	}
+
+	// artist
+	if len(metaData.Data.Staff) == 0 {
+		mediaMeta.Artist = metaData.Data.Owner.Name
+	} else {
+		var names []string
+		for _, staff := range metaData.Data.Staff {
+			names = append(names, staff.Name)
+		}
+		mediaMeta.Artist = strings.Join(names, ", ")
+	}
+
+	// audios
+	var bestAudio *struct {
+		Id           int      `json:"id"`
+		BaseUrl      string   `json:"baseUrl"`
+		BackupUrl    []string `json:"backupUrl"`
+		Bandwidth    int      `json:"bandwidth"`
+		MimeType     string   `json:"mimeType"`
+		Codecid      int      `json:"codecid"`
+		Codecs       string   `json:"codecs"`
+		Width        int      `json:"width"`
+		Height       int      `json:"height"`
+		FrameRate    string   `json:"frameRate"`
+		Sar          string   `json:"sar"`
+		StartWithSap int      `json:"startWithSap"`
+		SegmentBase  struct {
+			Initialization string `json:"Initialization"`
+			IndexRange     string `json:"indexRange"`
+		} `json:"SegmentBase"`
+		Codecid2 int `json:"codecid"`
+	}
+	maxBandwidth := 0
+
+	for i := range playData.Data.Dash.Audio {
+		audio := &playData.Data.Dash.Audio[i]
+		if audio.Bandwidth > maxBandwidth {
+			maxBandwidth = audio.Bandwidth
+			bestAudio = audio
+		}
+	}
+
+	if bestAudio != nil {
+		mediaMeta.Audios = append(mediaMeta.Audios, meta.Audio{
+			Url:     bestAudio.BaseUrl,
+			BitRate: bestAudio.Bandwidth / 1000,
+		})
+	}
+	
+	// videos
+	for _, video := range playData.Data.Dash.Video {
+		mediaMeta.Videos = append(mediaMeta.Videos, meta.Video{
+			Url:            video.BaseUrl,
+			Width:          video.Width,
+			Height:         video.Height,
+			Ratio:          getRatioById(video.Id),
+			NeedExtraAudio: true,
+		})
+	}
+	
 	return mediaMeta, nil
 }
 
