@@ -168,39 +168,19 @@ func (c *Core) fetchBytesFromApi() (mediaMeta *meta.MediaMeta, err error) {
 	}
 
 	// audios
-	var bestAudio *struct {
-		Id           int      `json:"id"`
-		BaseUrl      string   `json:"baseUrl"`
-		BackupUrl    []string `json:"backupUrl"`
-		Bandwidth    int      `json:"bandwidth"`
-		MimeType     string   `json:"mimeType"`
-		Codecid      int      `json:"codecid"`
-		Codecs       string   `json:"codecs"`
-		Width        int      `json:"width"`
-		Height       int      `json:"height"`
-		FrameRate    string   `json:"frameRate"`
-		Sar          string   `json:"sar"`
-		StartWithSap int      `json:"startWithSap"`
-		SegmentBase  struct {
-			Initialization string `json:"Initialization"`
-			IndexRange     string `json:"indexRange"`
-		} `json:"SegmentBase"`
-		Codecid2 int `json:"codecid"`
-	}
+	bestAudioIdx := -1
 	maxBandwidth := 0
-
 	for i := range playData.Data.Dash.Audio {
-		audio := &playData.Data.Dash.Audio[i]
-		if audio.Bandwidth > maxBandwidth {
-			maxBandwidth = audio.Bandwidth
-			bestAudio = audio
+		if playData.Data.Dash.Audio[i].Bandwidth > maxBandwidth {
+			maxBandwidth = playData.Data.Dash.Audio[i].Bandwidth
+			bestAudioIdx = i
 		}
 	}
-
-	if bestAudio != nil {
+	if bestAudioIdx >= 0 {
+		audio := playData.Data.Dash.Audio[bestAudioIdx]
 		mediaMeta.Audios = append(mediaMeta.Audios, meta.Audio{
-			Url:     bestAudio.BaseUrl,
-			BitRate: bestAudio.Bandwidth / 1000,
+			Url:     audio.BaseUrl,
+			BitRate: audio.Bandwidth / 1000,
 		})
 	}
 	
