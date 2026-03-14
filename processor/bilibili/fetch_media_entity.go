@@ -121,7 +121,6 @@ type BilibiliPlayUrlResponse struct {
 					Initialization string `json:"Initialization"`
 					IndexRange     string `json:"indexRange"`
 				} `json:"SegmentBase"`
-				Codecid2 int `json:"codecid"`
 			} `json:"video"`
 			Audio []struct {
 				Id           int      `json:"id"`
@@ -140,7 +139,6 @@ type BilibiliPlayUrlResponse struct {
 					Initialization string `json:"Initialization"`
 					IndexRange     string `json:"indexRange"`
 				} `json:"SegmentBase"`
-				Codecid2 int `json:"codecid"`
 			} `json:"audio"`
 			Dolby struct {
 				Type  int `json:"type"`
@@ -161,7 +159,6 @@ type BilibiliPlayUrlResponse struct {
 						Initialization string `json:"Initialization"`
 						IndexRange     string `json:"indexRange"`
 					} `json:"SegmentBase"`
-					Codecid2 int `json:"codecid"`
 				} `json:"audio"`
 			} `json:"dolby"`
 			Flac interface{} `json:"flac"`
