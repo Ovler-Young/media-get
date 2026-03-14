@@ -46,6 +46,18 @@ jobs:
         run: make build
 
       - name: Test
+        id: test
+        continue-on-error: true
         env:
           ENV_MEDIA_GET: ${{ secrets.ENV_MEDIA_GET }}
         run: make test
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-get-${{ matrix.os }}
+          path: main
+
+      - name: Fail if tests failed
+        if: steps.test.outcome == 'failure'
+        run: exit 1
