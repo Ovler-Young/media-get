@@ -8,7 +8,6 @@ import (
 
 	"github.com/foamzou/audio-get/args"
 	"github.com/foamzou/audio-get/consts"
-	"github.com/foamzou/audio-get/logger"
 	"github.com/foamzou/audio-get/meta"
 	"github.com/foamzou/audio-get/utils"
 )
@@ -48,7 +47,6 @@ func (c *Core) FetchMetaAndResourceInfo() (mediaMeta *meta.MediaMeta, err error)
 	// audio resource
 	matchStr, err := utils.RegexSingleMatch(html, `window.__playinfo__=(.+?)<\/script`)
 	if err != nil {
-		logger.Warn("fetch playinfo failed, try to fetch from api", err)
 		return c.fetchBytesFromApi()
 	}
 	resource := &AudioResource{}
@@ -66,7 +64,6 @@ func (c *Core) FetchMetaAndResourceInfo() (mediaMeta *meta.MediaMeta, err error)
 	audioMeta := &AudioMeta{}
 	err = json.Unmarshal([]byte(metaJson), audioMeta)
 	if err != nil {
-		logger.Warn("fetch meta json failed", err)
 		mediaMeta.Title = utils.RegexSingleMatchIgnoreError(html, `<h1 title="(.+?)"`, utils.Md5(c.Opts.Url))
 	} else {
 		mediaMeta.Title = audioMeta.VideoData.Title
@@ -125,7 +122,7 @@ func (c *Core) fetchBytesFromApi() (mediaMeta *meta.MediaMeta, err error) {
 	}
 
 	// fetch resource
-	playUrl := "https://api.bilibili.com/x/player/playurl?bvid=" + bvid + "&cid=" + strconv.Itoa(metaData.Data.Cid) + "&qn=80&fnval=4048"
+	playUrl := "https://api.bilibili.com/x/player/playurl?bvid=" + bvid + "&cid=" + strconv.Itoa(metaData.Data.Cid) + "&qn=80&fnval=4048&try_look=1"
 	playJson, err := utils.HttpGet(consts.SourceNameBilibili, playUrl, map[string]string{
 		"user-agent": consts.UAMac,
 		"referer":    c.Opts.Url,
