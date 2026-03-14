@@ -20,15 +20,15 @@ jobs:
 
     steps:
       - name: Install Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v4
         with:
           go-version: ${{matrix.go-version}}
 
       - name: Checkout Code Base
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Restore Go Module Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ~/go/internal/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
